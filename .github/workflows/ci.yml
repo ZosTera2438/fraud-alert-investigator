@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      FRAUD_MODEL_PROVIDER: scripted
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: uv sync --extra evals
+      - name: Lint
+        run: |
+          uv run ruff check src tests evals data ui
+          uv run ruff format --check src tests evals data ui
+      - name: Type check
+        run: uv run pyright
+      - name: Tests
+        run: uv run pytest
+      - name: Generate data
+        run: uv run python data/generate.py --seed 42
+      - name: Evaluation and release gate
+        run: uv run python evals/run_evals.py --trials 3 --gate --quiet
+      - name: Upload scorecard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scorecard
+          path: evals/reports/

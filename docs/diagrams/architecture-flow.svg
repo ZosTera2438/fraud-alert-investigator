@@ -1,0 +1,200 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1175" viewBox="0 0 1280 1175" role="img" aria-labelledby="title desc">
+  <title id="title">Fraud Alert Investigator runtime flow</title>
+  <desc id="desc">A fraud alert passes through intake, an investigator agent with read-only tools, a deterministic risk scoring engine, a decision agent and policy hooks, then ends in allow, escalate, or block after human approval.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3C4043"/>
+    </marker>
+    <style>
+      text { font-family: "Segoe UI", Helvetica, Arial, sans-serif; fill: #202124; }
+      .h1 { font-size: 22px; font-weight: 600; }
+      .h { font-size: 14px; font-weight: 600; }
+      .t { font-size: 12px; }
+      .s { font-size: 11px; fill: #3C4043; }
+      .mono { font-family: Consolas, "Courier New", monospace; font-size: 12px; }
+      .agent { fill: #E8F0FE; stroke: #1A73E8; stroke-width: 1.5; }
+      .code { fill: #E6F4EA; stroke: #188038; stroke-width: 1.5; }
+      .human { fill: #FEF7E0; stroke: #E37400; stroke-width: 1.5; }
+      .tools { fill: #F3E8FD; stroke: #8430CE; stroke-width: 1.5; }
+      .cross { fill: #F1F3F4; stroke: #5F6368; stroke-width: 1.5; }
+      .input { fill: #FFFFFF; stroke: #3C4043; stroke-width: 1.5; }
+      .danger { fill: #FCE8E6; stroke: #D93025; stroke-width: 1.5; }
+      .flow { stroke: #3C4043; stroke-width: 1.6; fill: none; }
+      .dashed { stroke: #5F6368; stroke-width: 1.4; fill: none; stroke-dasharray: 6 4; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="1175" fill="#FFFFFF"/>
+
+  <!-- Title and legend -->
+  <text x="40" y="40" class="h1">Fraud Alert Investigator: runtime flow</text>
+  <rect x="40" y="56" width="16" height="16" rx="3" class="agent"/>
+  <text x="62" y="69" class="t">Strands agent (model-driven)</text>
+  <rect x="250" y="56" width="16" height="16" rx="3" class="code"/>
+  <text x="272" y="69" class="t">Deterministic code</text>
+  <rect x="420" y="56" width="16" height="16" rx="3" class="human"/>
+  <text x="442" y="69" class="t">Human step</text>
+  <rect x="560" y="56" width="16" height="16" rx="3" class="tools"/>
+  <text x="582" y="69" class="t">Tools and data</text>
+  <rect x="720" y="56" width="16" height="16" rx="3" class="cross"/>
+  <text x="742" y="69" class="t">Applies to every step</text>
+  <rect x="900" y="56" width="16" height="16" rx="3" class="danger"/>
+  <text x="922" y="69" class="t">Irreversible action</text>
+
+  <!-- Fraud alert -->
+  <rect x="310" y="95" width="380" height="60" rx="8" class="input"/>
+  <text x="500" y="120" text-anchor="middle" class="h">Fraud alert arrives</text>
+  <text x="500" y="142" text-anchor="middle" class="t">Card token, transaction, triggering rule</text>
+  <line x1="500" y1="155" x2="500" y2="183" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- 1. Intake -->
+  <rect x="310" y="185" width="380" height="90" rx="8" class="code"/>
+  <text x="500" y="208" text-anchor="middle" class="h">1. Intake node (code)</text>
+  <text x="500" y="230" text-anchor="middle" class="t">Validate alert schema (Pydantic)</text>
+  <text x="500" y="248" text-anchor="middle" class="t">Create idempotency key</text>
+  <text x="500" y="266" text-anchor="middle" class="t">Mask card number and personal data</text>
+  <line x1="500" y1="275" x2="500" y2="303" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- 2. Investigator agent -->
+  <rect x="310" y="305" width="380" height="100" rx="8" class="agent"/>
+  <text x="500" y="328" text-anchor="middle" class="h">2. Investigator agent (Strands)</text>
+  <text x="500" y="350" text-anchor="middle" class="t">Read-only tools, called in parallel</text>
+  <text x="500" y="368" text-anchor="middle" class="t">Decides which evidence each alert needs</text>
+  <text x="500" y="386" text-anchor="middle" class="t">Returns evidence bundle with evidence IDs</text>
+
+  <!-- Tool server -->
+  <rect x="800" y="285" width="440" height="150" rx="8" class="tools"/>
+  <text x="1020" y="308" text-anchor="middle" class="h">Model Context Protocol tool server (read-only)</text>
+  <text x="822" y="334" class="mono">get_transaction_history(customer_id, days)</text>
+  <text x="822" y="354" class="mono">get_merchant_profile(merchant_id)</text>
+  <text x="822" y="374" class="mono">get_device_metadata(device_id)</text>
+  <text x="822" y="394" class="mono">get_customer_profile(customer_id)</text>
+  <text x="822" y="414" class="mono">search_fraud_playbook(query)</text>
+
+  <line x1="692" y1="355" x2="798" y2="355" class="flow" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="745" y="345" text-anchor="middle" class="s">tool calls</text>
+  <text x="745" y="374" text-anchor="middle" class="s">untrusted results</text>
+
+  <!-- Data stores -->
+  <line x1="905" y1="435" x2="905" y2="458" class="flow" marker-end="url(#arrow)"/>
+  <line x1="1135" y1="435" x2="1135" y2="458" class="flow" marker-end="url(#arrow)"/>
+  <rect x="800" y="460" width="210" height="64" rx="8" class="tools"/>
+  <text x="905" y="484" text-anchor="middle" class="h">SQLite (synthetic data)</text>
+  <text x="905" y="502" text-anchor="middle" class="t">Customers, cards, devices,</text>
+  <text x="905" y="518" text-anchor="middle" class="t">merchants, transactions</text>
+  <rect x="1030" y="460" width="210" height="64" rx="8" class="tools"/>
+  <text x="1135" y="484" text-anchor="middle" class="h">Fraud playbook index</text>
+  <text x="1135" y="502" text-anchor="middle" class="t">Vector search over</text>
+  <text x="1135" y="518" text-anchor="middle" class="t">fraud typology notes</text>
+
+  <line x1="500" y1="405" x2="500" y2="433" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- 3. Risk scoring -->
+  <rect x="310" y="435" width="380" height="100" rx="8" class="code"/>
+  <text x="500" y="458" text-anchor="middle" class="h">3. Risk scoring engine (code)</text>
+  <text x="500" y="480" text-anchor="middle" class="t">Reads raw tool results, not model text</text>
+  <text x="500" y="498" text-anchor="middle" class="t">Weighted rules plus optional machine learning model</text>
+  <text x="500" y="516" text-anchor="middle" class="t">Score 0 to 100 with signal breakdown</text>
+
+  <!-- Scoring configuration -->
+  <rect x="800" y="545" width="440" height="50" rx="8" class="code"/>
+  <text x="1020" y="566" text-anchor="middle" class="h">config/scoring.yaml</text>
+  <text x="1020" y="584" text-anchor="middle" class="t">Weights and bands: allow under 40, escalate 40 to 74, block 75+</text>
+  <path d="M800,570 H745 V500 H692" class="flow" marker-end="url(#arrow)"/>
+
+  <line x1="500" y1="535" x2="500" y2="563" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- 4. Decision agent -->
+  <rect x="310" y="565" width="380" height="100" rx="8" class="agent"/>
+  <text x="500" y="588" text-anchor="middle" class="h">4. Decision agent (Strands)</text>
+  <text x="500" y="610" text-anchor="middle" class="t">Writes InvestigationReport (structured output)</text>
+  <text x="500" y="628" text-anchor="middle" class="t">Recommends allow, escalate or block</text>
+  <text x="500" y="646" text-anchor="middle" class="t">Cites evidence IDs for every finding</text>
+
+  <!-- Model provider -->
+  <rect x="800" y="615" width="440" height="70" rx="8" class="cross"/>
+  <text x="1020" y="638" text-anchor="middle" class="h">Model provider (set in settings.yaml)</text>
+  <text x="1020" y="658" text-anchor="middle" class="t">Gemini Flash (cloud) or Ollama (local laptop)</text>
+  <text x="1020" y="676" text-anchor="middle" class="t">Same agent code; used by both agents</text>
+  <line x1="798" y1="645" x2="694" y2="625" class="dashed" marker-end="url(#arrow)"/>
+
+  <line x1="500" y1="665" x2="500" y2="693" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- 5. Policy guard -->
+  <rect x="310" y="695" width="380" height="95" rx="8" class="code"/>
+  <text x="500" y="718" text-anchor="middle" class="h">5. Policy guard and approval hooks (code)</text>
+  <text x="500" y="740" text-anchor="middle" class="t">Decision matches score band?</text>
+  <text x="500" y="758" text-anchor="middle" class="t">Every cited evidence ID exists?</text>
+  <text x="500" y="776" text-anchor="middle" class="t">Budget and amount limits respected?</text>
+
+  <!-- Retry loop -->
+  <path d="M310,742 H270 V615 H308" class="flow" marker-end="url(#arrow)"/>
+  <text x="262" y="664" text-anchor="end" class="s">Check fails:</text>
+  <text x="262" y="680" text-anchor="end" class="s">revise once,</text>
+  <text x="262" y="696" text-anchor="end" class="s">then escalate</text>
+
+  <line x1="500" y1="790" x2="500" y2="818" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- Decision diamond -->
+  <polygon points="500,820 620,865 500,910 380,865" class="input"/>
+  <text x="500" y="870" text-anchor="middle" class="h">Final decision</text>
+
+  <!-- Allow branch -->
+  <path d="M380,865 H160 V943" class="flow" marker-end="url(#arrow)"/>
+  <text x="270" y="857" text-anchor="middle" class="s">allow</text>
+  <rect x="40" y="945" width="240" height="70" rx="8" class="code"/>
+  <text x="160" y="972" text-anchor="middle" class="h">Allow</text>
+  <text x="160" y="994" text-anchor="middle" class="t">Close alert and log decision</text>
+
+  <!-- Escalate branch -->
+  <line x1="500" y1="910" x2="500" y2="943" class="flow" marker-end="url(#arrow)"/>
+  <text x="510" y="932" class="s">escalate</text>
+  <rect x="380" y="945" width="240" height="70" rx="8" class="code"/>
+  <text x="500" y="972" text-anchor="middle" class="h">Escalate</text>
+  <text x="500" y="994" text-anchor="middle" class="t">Add to analyst queue with report</text>
+
+  <!-- Block branch -->
+  <path d="M620,865 H830 V943" class="flow" marker-end="url(#arrow)"/>
+  <text x="725" y="857" text-anchor="middle" class="s">block</text>
+  <rect x="720" y="945" width="220" height="70" rx="8" class="human"/>
+  <text x="830" y="970" text-anchor="middle" class="h">Human approval</text>
+  <text x="830" y="990" text-anchor="middle" class="t">Strands interrupt pauses the run</text>
+  <text x="830" y="1006" text-anchor="middle" class="t">Analyst approves or rejects</text>
+
+  <line x1="940" y1="980" x2="1008" y2="980" class="flow" marker-end="url(#arrow)"/>
+  <text x="975" y="970" text-anchor="middle" class="s">approved</text>
+  <rect x="1010" y="945" width="230" height="70" rx="8" class="danger"/>
+  <text x="1125" y="972" text-anchor="middle" class="h">Block card and create case</text>
+  <text x="1125" y="994" text-anchor="middle" class="t">Idempotent; mock card service</text>
+
+  <!-- Rejected path -->
+  <path d="M830,1015 V1040 H500 V1017" class="flow" marker-end="url(#arrow)"/>
+  <text x="665" y="1034" text-anchor="middle" class="s">rejected: escalate instead</text>
+
+  <!-- Cross-cutting bar -->
+  <text x="40" y="1066" class="h">Applies to every step</text>
+  <rect x="40" y="1075" width="232" height="80" rx="8" class="cross"/>
+  <text x="156" y="1098" text-anchor="middle" class="h">Tracing</text>
+  <text x="156" y="1118" text-anchor="middle" class="t">OpenTelemetry to Arize Phoenix</text>
+  <text x="156" y="1136" text-anchor="middle" class="t">Tokens, latency, cost per alert</text>
+
+  <rect x="282" y="1075" width="232" height="80" rx="8" class="cross"/>
+  <text x="398" y="1098" text-anchor="middle" class="h">Session manager</text>
+  <text x="398" y="1118" text-anchor="middle" class="t">Resume a paused or</text>
+  <text x="398" y="1136" text-anchor="middle" class="t">crashed investigation</text>
+
+  <rect x="524" y="1075" width="232" height="80" rx="8" class="cross"/>
+  <text x="640" y="1098" text-anchor="middle" class="h">Budget hook</text>
+  <text x="640" y="1118" text-anchor="middle" class="t">Maximum tool calls and</text>
+  <text x="640" y="1136" text-anchor="middle" class="t">tokens per alert</text>
+
+  <rect x="766" y="1075" width="232" height="80" rx="8" class="cross"/>
+  <text x="882" y="1098" text-anchor="middle" class="h">Audit log</text>
+  <text x="882" y="1118" text-anchor="middle" class="t">Every tool call, decision</text>
+  <text x="882" y="1136" text-anchor="middle" class="t">and approval</text>
+
+  <rect x="1008" y="1075" width="232" height="80" rx="8" class="cross"/>
+  <text x="1124" y="1098" text-anchor="middle" class="h">Fail-safe</text>
+  <text x="1124" y="1118" text-anchor="middle" class="t">Any error, timeout or budget</text>
+  <text x="1124" y="1136" text-anchor="middle" class="t">breach ends in escalate</text>
+</svg>

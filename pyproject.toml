@@ -1,0 +1,59 @@
+[project]
+name = "fraud-investigator"
+version = "0.1.0"
+description = "Agent that investigates card fraud alerts and recommends allow, escalate or block, with a human approving every block."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "faker>=40.44.0",
+    "fastapi>=0.162.0",
+    "httpx>=0.28.1",
+    "mcp>=2.3.0",
+    "pydantic>=2.14.2",
+    "pyyaml>=6.0.3",
+    "strands-agents[gemini,ollama,otel]>=1.63.0",
+    "tenacity>=9.1.4",
+    "uvicorn>=0.54.0",
+]
+
+[project.optional-dependencies]
+ml = ["scikit-learn>=1.5", "numpy>=2.0"]
+ui = ["streamlit>=1.40"]
+evals = ["strands-agents-evals>=0.1"]
+
+[project.scripts]
+fraud-investigator = "fraud_investigator.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.25,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+reportMissingImports = "warning"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "live: needs a live model (Gemini key or a running Ollama)",
+]

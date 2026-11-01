@@ -1,0 +1,48 @@
+# One-command demo:  docker compose up --build
+#   console  http://localhost:8501
+#   api      http://localhost:8000/docs
+#   phoenix  http://localhost:6006   (traces)
+# Live models: set FRAUD_MODEL_PROVIDER=gemini and GEMINI_API_KEY in .env,
+# or FRAUD_MODEL_PROVIDER=ollama and pull a model: docker compose exec ollama ollama pull qwen3:8b
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: [{path: .env, required: false}]
+    environment:
+      FRAUD_TRACING: "1"
+      OLLAMA_HOST: http://ollama:11434
+      FRAUD_MCP_URL: http://tools:8765/mcp
+    command: >
+      sh -c "sed -i 's#otlp_endpoint: .*#otlp_endpoint: http://phoenix:6006/v1/traces#; s#transport: local#transport: mcp#' config/settings.yaml
+      && uv run uvicorn fraud_investigator.api.app:app --host 0.0.0.0 --port 8000"
+    volumes: [state:/app/data/runs, sessions:/app/data/sessions]
+    depends_on: [tools, phoenix]
+
+  tools:
+    build: .
+    command: ["uv", "run", "python", "-m", "fraud_investigator.mcp_server", "--http", "8765"]
+    ports: ["8765:8765"]
+
+  ui:
+    build: .
+    command: ["uv", "run", "streamlit", "run", "ui/streamlit_app.py", "--server.address", "0.0.0.0"]
+    environment:
+      FRAUD_API_URL: http://api:8000
+    ports: ["8501:8501"]
+    depends_on: [api]
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports: ["6006:6006"]
+
+  ollama:
+    image: ollama/ollama:latest
+    ports: ["11434:11434"]
+    volumes: [ollama:/root/.ollama]
+    profiles: [local-model]
+
+volumes:
+  state: {}
+  sessions: {}
+  ollama: {}

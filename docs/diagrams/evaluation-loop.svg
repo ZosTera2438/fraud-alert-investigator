@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="580" viewBox="0 0 1280 580" role="img" aria-labelledby="title desc">
+  <title id="title">Fraud Alert Investigator evaluation loop</title>
+  <desc id="desc">Labelled cases run through the evaluation harness, graders and scorecard. A release gate either pins the release or sends failures through trace inspection, categorisation and a new test case before rerunning.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3C4043"/>
+    </marker>
+    <style>
+      text { font-family: "Segoe UI", Helvetica, Arial, sans-serif; fill: #202124; }
+      .h1 { font-size: 22px; font-weight: 600; }
+      .h { font-size: 14px; font-weight: 600; }
+      .t { font-size: 12px; }
+      .s { font-size: 11px; fill: #3C4043; }
+      .agent { fill: #E8F0FE; stroke: #1A73E8; stroke-width: 1.5; }
+      .code { fill: #E6F4EA; stroke: #188038; stroke-width: 1.5; }
+      .tools { fill: #F3E8FD; stroke: #8430CE; stroke-width: 1.5; }
+      .cross { fill: #F1F3F4; stroke: #5F6368; stroke-width: 1.5; }
+      .input { fill: #FFFFFF; stroke: #3C4043; stroke-width: 1.5; }
+      .flow { stroke: #3C4043; stroke-width: 1.6; fill: none; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="580" fill="#FFFFFF"/>
+
+  <text x="30" y="40" class="h1">Fraud Alert Investigator: evaluation loop</text>
+  <text x="30" y="66" class="t">Runs on every pull request with recorded model responses, and nightly on the laptop against live Gemini and Ollama.</text>
+
+  <!-- Golden dataset -->
+  <rect x="30" y="110" width="220" height="110" rx="8" class="tools"/>
+  <text x="140" y="135" text-anchor="middle" class="h">Golden dataset</text>
+  <text x="140" y="158" text-anchor="middle" class="t">About 66 labelled alerts</text>
+  <text x="140" y="176" text-anchor="middle" class="t">Red-team cases: injection,</text>
+  <text x="140" y="194" text-anchor="middle" class="t">tool failure, malformed data</text>
+  <line x1="250" y1="165" x2="278" y2="165" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- Harness -->
+  <rect x="280" y="110" width="230" height="110" rx="8" class="agent"/>
+  <text x="395" y="135" text-anchor="middle" class="h">Evaluation harness</text>
+  <text x="395" y="158" text-anchor="middle" class="t">Strands Evals experiment</text>
+  <text x="395" y="176" text-anchor="middle" class="t">Each case run 3 times</text>
+  <text x="395" y="194" text-anchor="middle" class="t">Tools served from fixtures</text>
+  <line x1="510" y1="165" x2="538" y2="165" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- Graders -->
+  <rect x="540" y="110" width="240" height="110" rx="8" class="code"/>
+  <text x="660" y="135" text-anchor="middle" class="h">Graders</text>
+  <text x="660" y="158" text-anchor="middle" class="t">Code: decision, schema, tools,</text>
+  <text x="660" y="176" text-anchor="middle" class="t">citations, injection resistance</text>
+  <text x="660" y="194" text-anchor="middle" class="t">Model judge: explanation quality</text>
+  <line x1="780" y1="165" x2="808" y2="165" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- Scorecard -->
+  <rect x="810" y="110" width="200" height="110" rx="8" class="cross"/>
+  <text x="910" y="135" text-anchor="middle" class="h">Scorecard</text>
+  <text x="910" y="158" text-anchor="middle" class="t">Accuracy, missed fraud,</text>
+  <text x="910" y="176" text-anchor="middle" class="t">false blocks, consistency,</text>
+  <text x="910" y="194" text-anchor="middle" class="t">p95 latency, cost per alert</text>
+  <line x1="1010" y1="165" x2="1038" y2="165" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- Release gate -->
+  <polygon points="1140,110 1240,165 1140,220 1040,165" class="input"/>
+  <text x="1140" y="160" text-anchor="middle" class="h">Meets release</text>
+  <text x="1140" y="178" text-anchor="middle" class="h">thresholds?</text>
+
+  <!-- Yes: release -->
+  <line x1="1140" y1="220" x2="1140" y2="288" class="flow" marker-end="url(#arrow)"/>
+  <text x="1150" y="258" class="s">yes</text>
+  <rect x="1030" y="290" width="220" height="80" rx="8" class="code"/>
+  <text x="1140" y="315" text-anchor="middle" class="h">Release</text>
+  <text x="1140" y="337" text-anchor="middle" class="t">Pin model, prompts, tools</text>
+  <text x="1140" y="355" text-anchor="middle" class="t">and scoring config together</text>
+
+  <!-- No: failure analysis -->
+  <path d="M1240,165 H1265 V460 H1012" class="flow" marker-end="url(#arrow)"/>
+  <text x="1252" y="152" text-anchor="middle" class="s">no</text>
+
+  <rect x="810" y="420" width="200" height="80" rx="8" class="cross"/>
+  <text x="910" y="445" text-anchor="middle" class="h">Inspect traces</text>
+  <text x="910" y="467" text-anchor="middle" class="t">Arize Phoenix trace tree</text>
+  <text x="910" y="485" text-anchor="middle" class="t">for each failed case</text>
+  <line x1="810" y1="460" x2="782" y2="460" class="flow" marker-end="url(#arrow)"/>
+
+  <rect x="540" y="420" width="240" height="80" rx="8" class="code"/>
+  <text x="660" y="445" text-anchor="middle" class="h">Categorise the failure</text>
+  <text x="660" y="467" text-anchor="middle" class="t">Wrong tool, bad citation,</text>
+  <text x="660" y="485" text-anchor="middle" class="t">injection, score band, format</text>
+  <line x1="540" y1="460" x2="512" y2="460" class="flow" marker-end="url(#arrow)"/>
+
+  <rect x="280" y="420" width="230" height="80" rx="8" class="tools"/>
+  <text x="395" y="445" text-anchor="middle" class="h">Add case and fix</text>
+  <text x="395" y="467" text-anchor="middle" class="t">New case in golden set,</text>
+  <text x="395" y="485" text-anchor="middle" class="t">then change prompt, tool or rule</text>
+
+  <!-- Rerun -->
+  <path d="M280,460 H140 V222" class="flow" marker-end="url(#arrow)"/>
+  <text x="150" y="330" class="s">rerun</text>
+
+  <!-- Thresholds -->
+  <text x="30" y="540" class="t">Release thresholds: accuracy 90 percent or higher, zero missed fraud on block scenarios, false block rate 5 percent or lower,</text>
+  <text x="30" y="558" class="t">100 percent schema validity, zero injection cases followed, same decision across 3 trials in 95 percent of cases.</text>
+</svg>

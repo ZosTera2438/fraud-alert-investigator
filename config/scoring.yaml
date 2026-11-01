@@ -1,0 +1,59 @@
+# Risk scoring rules. Versioned with the code; every change goes through review
+# and the evaluation gate. The engine reads raw tool results, never model text.
+version: "2026-10-31.1"
+
+bands:
+  allow_below: 40      # score < 40            -> allow
+  block_from: 75       # 40 <= score < 75      -> escalate; score >= 75 -> block
+
+thresholds:
+  amount_sigma: 3.0              # amount above mean + 3 standard deviations of history
+  amount_min_history: 5          # fewer prior transactions -> amount signal not evaluated
+  velocity_window_minutes: 60
+  velocity_count: 5              # more than this many transactions in the window
+  card_testing_max_amount: 5.0   # small charges used to test a stolen card
+  card_testing_count: 5          # at least this many small charges in the velocity window
+  new_device_hours: 24
+  trusted_device_days: 180
+  impossible_travel_kmh: 900
+  merchant_chargeback_rate: 0.01
+  merchant_new_days: 30
+  account_change_hours: 48
+  dispute_count_90d: 3
+  known_merchant_min_txns: 2
+
+signals:
+  amount_anomaly: 15
+  velocity: 20
+  card_testing: 25
+  new_device: 15
+  device_risk: 20
+  impossible_travel: 35
+  geo_mismatch: 10
+  merchant_risk: 15
+  account_change: 20
+  dispute_history: 30
+
+# Patterns: extra points when signals fire together.
+combinations:
+  account_takeover_pattern:
+    all_of: [account_change, new_device]
+    points: 20
+  travel_fraud_pattern:
+    all_of: [impossible_travel, geo_mismatch]
+    points: 20
+  compromised_device_pattern:
+    all_of: [device_risk, new_device]
+    points: 20
+
+# Mitigating signals subtract points (score floors at 0).
+mitigations:
+  travel_notice: 15
+  trusted_device: 15
+  known_merchant: 10
+
+# Optional machine learning blend. Off by default; needs the `ml` extra.
+ml_blend:
+  enabled: false
+  weight: 0.3
+  model_path: data/ml_model.pkl

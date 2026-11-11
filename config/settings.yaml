@@ -1,27 +1,31 @@
 # Runtime settings. Variables in .env (git-ignored) are loaded first. Environment overrides:
-#   FRAUD_MODEL_PROVIDER=scripted|gemini|ollama|replay
+#   FRAUD_MODEL_PROVIDER=scripted|cloudflare|gemini|replay
 #   FRAUD_MODEL_ID=<model id for the chosen provider>
 #   GEMINI_API_KEY=<key>   (or GOOGLE_API_KEY)
-#   FRAUD_MODEL_FALLBACK=gemini|ollama|none
-#   OLLAMA_HOST=http://localhost:11434
+#   FRAUD_MODEL_FALLBACK=gemini|cloudflare|none
+#   CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, CLOUDFLARE_MODEL=<@cf/... model id>
 
 model:
-  # scripted: deterministic offline policy used in tests and CI (no network).
-  # replay:   replays model responses recorded from a live run (see evals/recordings).
+  # scripted:   deterministic offline policy used in tests and CI (no network).
+  # cloudflare: the live model (set FRAUD_MODEL_PROVIDER=cloudflare in .env).
+  # gemini:     used for model comparisons (evals/reports/gemini-vs-cloudflare.md).
+  # replay:     replays model responses recorded from a live run (see evals/recordings).
   provider: scripted
-  fallback: gemini          # used when the primary model is rate limited or down; null disables
-  fallback_model_id: gemini-3.5-flash-lite
+  fallback: cloudflare      # used when the live model is rate limited or down; null disables
+  fallback_model_id: "@cf/zai-org/glm-5.3-flash"
   gemini:
-    model_id: gemini-3.5-flash
+    model_id: gemini-3.7-flash
     temperature: 0.0
     max_output_tokens: 2048
-  ollama:
-    host: http://localhost:11434
-    model_id: qwen3:8b
+  cloudflare:               # Workers AI, OpenAI-compatible endpoint; 10,000 free neurons per day
+    # Chosen on 2026-11-11 from 5 tool-calling models (evals/reports/gemini-vs-cloudflare.md).
+    model_id: "@cf/deepseek-ai/deepseek-v4.1-flash-1017"
     temperature: 0.0
-  aux_model:                # side calls such as the explanation judge
-    provider: gemini
-    model_id: gemini-3.5-flash-lite
+    max_tokens: 4096        # gpt-oss counts hidden reasoning here; 2048 ran out mid-report
+    reasoning_effort: low   # gpt-oss only
+  aux_model:                # side calls such as the explanation judge (a different model family from the agent)
+    provider: cloudflare
+    model_id: "@cf/zai-org/glm-5.3-flash"
   recordings_dir: evals/recordings
 
 budgets:
@@ -55,6 +59,10 @@ observability:
 pricing:
   gemini-2.5-flash: {input: 0.46, output: 3.85}
   gemini-2.5-flash-lite: {input: 0.15, output: 0.62}
-  qwen3:8b: {input: 0.0, output: 0.0}
-  llama3.1:8b: {input: 0.0, output: 0.0}
+  # Workers AI list prices in USD (0.30/1.20, 0.15/0.50, 0.35/0.75, 0.293/2.253) at 1 USD = 1.53 AUD, checked 2026-11-11:
+  # https://developers.cloudflare.com/workers-ai/platform/pricing/ (first 10,000 neurons a day are free)
+  "@cf/deepseek-ai/deepseek-v4.1-flash-1017": {input: 0.46, output: 1.84}
+  "@cf/zai-org/glm-5.3-flash": {input: 0.23, output: 0.77}
+  "@cf/openai/gpt-oss-120b": {input: 0.54, output: 1.15}
+  "@cf/meta/llama-3.3-70b-instruct-fp8-fast": {input: 0.45, output: 3.45}
   scripted: {input: 0.0, output: 0.0}

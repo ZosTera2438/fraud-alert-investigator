@@ -37,10 +37,13 @@ with st.sidebar:
             st.session_state["alert_id"] = p["alert_id"]
 
 alerts = client.get("/alerts").json()
-labels = {f"{a['id']} · {a['trigger_rule']} · {a['amount']:.2f} AUD · {a['status']}": a["id"] for a in alerts}
-default = next((i for i, v in enumerate(labels.values()) if v == st.session_state.get("alert_id")), 0)
-choice = st.selectbox("Alert", list(labels), index=default)
-alert_id = labels[choice]
+# Options are alert IDs (stable); the label shows the status, which changes after an approval. Keying the
+# widget on labels would reset the selection to the first alert whenever a status changed.
+labels = {a["id"]: f"{a['id']} · {a['trigger_rule']} · {a['amount']:.2f} AUD · {a['status']}" for a in alerts}
+ids = list(labels)
+if st.session_state.get("alert_id") in labels:
+    st.session_state["alert_select"] = st.session_state.pop("alert_id")
+alert_id = st.selectbox("Alert", ids, format_func=labels.__getitem__, key="alert_select")
 
 col_run, col_load = st.columns(2)
 run = None

@@ -20,3 +20,6 @@ evals/reports/*.json
 evals/recordings/
 
 .env
+
+# Private planning notes (interview prep, resume drafts)
+plan/

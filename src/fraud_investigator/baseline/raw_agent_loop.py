@@ -7,8 +7,9 @@ approval. It reuses the data backend, scoring engine and policy rules so the
 comparison isolates the loop itself (ADR 0002).
 
 The model side is a tiny `ChatModel` protocol with two adapters:
-`OllamaChat` (plain HTTP to /api/chat) and `StrandsModelAdapter`, which only
-borrows a Strands provider's `stream()` for the scripted and Gemini models.
+`OpenAICompatibleChat` (plain HTTP to /chat/completions, for example Cloudflare
+Workers AI) and `StrandsModelAdapter`, which only borrows a Strands provider's
+`stream()` for the scripted and live models.
 Neither the Strands Agent, hooks, Graph nor its tool decorator is used.
 """
 
@@ -90,9 +91,19 @@ class StrandsModelAdapter:
         return asyncio.run(collect())
 
 
-class OllamaChat:
-    def __init__(self, host: str = "http://localhost:11434", model_id: str = "qwen3:8b") -> None:
-        self.host, self.model_id = host.rstrip("/"), model_id
+class OpenAICompatibleChat:
+    """Plain HTTP to any OpenAI-compatible `/chat/completions` endpoint, such as Cloudflare Workers AI."""
+
+    def __init__(
+        self, base_url: str, api_key: str, model_id: str, transport: httpx.BaseTransport | None = None
+    ) -> None:
+        self.url = base_url.rstrip("/") + "/chat/completions"
+        self.model_id = model_id
+        self.client = httpx.Client(headers={"Authorization": f"Bearer {api_key}"}, timeout=120, transport=transport)
+
+    @classmethod
+    def cloudflare(cls, account_id: str, api_token: str, model_id: str) -> OpenAICompatibleChat:
+        return cls(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1", api_token, model_id)
 
     def complete(self, system: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> Turn:
         converted: list[dict[str, Any]] = [{"role": "system", "content": system}]
@@ -101,31 +112,38 @@ class OllamaChat:
                 if "text" in b:
                     converted.append({"role": m["role"], "content": b["text"]})
                 elif "toolUse" in b:
+                    call = b["toolUse"]
                     converted.append(
                         {
                             "role": "assistant",
                             "content": "",
                             "tool_calls": [
-                                {"function": {"name": b["toolUse"]["name"], "arguments": b["toolUse"]["input"]}}
+                                {
+                                    "id": call["toolUseId"],
+                                    "type": "function",
+                                    "function": {"name": call["name"], "arguments": json.dumps(call["input"])},
+                                }
                             ],
                         }
                     )
                 elif "toolResult" in b:
-                    converted.append({"role": "tool", "content": b["toolResult"]["content"][0]["text"]})
-        body = {
-            "model": self.model_id,
-            "messages": converted,
-            "stream": False,
-            "options": {"temperature": 0},
-            "tools": [{"type": "function", "function": t} for t in tools],
-        }
-        data = httpx.post(f"{self.host}/api/chat", json=body, timeout=120).json()
-        msg = data.get("message", {})
+                    result = b["toolResult"]
+                    converted.append(
+                        {"role": "tool", "tool_call_id": result["toolUseId"], "content": result["content"][0]["text"]}
+                    )
+        body: dict[str, Any] = {"model": self.model_id, "messages": converted, "temperature": 0, "max_tokens": 4096}
+        if tools:  # Workers AI rejects an empty list
+            body["tools"] = [{"type": "function", "function": t} for t in tools]
+        response = self.client.post(self.url, json=body)
+        response.raise_for_status()
+        data = response.json()
+        msg = data["choices"][0]["message"]
         calls = [
-            ToolCall(f"call_{i}", c["function"]["name"], c["function"].get("arguments") or {})
-            for i, c in enumerate(msg.get("tool_calls") or [])
+            ToolCall(c["id"], c["function"]["name"], json.loads(c["function"].get("arguments") or "{}"))
+            for c in msg.get("tool_calls") or []
         ]
-        return Turn(msg.get("content", ""), calls, data.get("prompt_eval_count", 0), data.get("eval_count", 0))
+        usage = data.get("usage") or {}
+        return Turn(msg.get("content") or "", calls, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
 
 
 def _schema(props: dict[str, Any], required: list[str]) -> dict[str, Any]:

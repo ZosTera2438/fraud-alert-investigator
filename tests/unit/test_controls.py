@@ -199,3 +199,121 @@ def test_fallback_on_overload_but_not_on_bad_request() -> None:
 
     assert is_transient(ServerError("503 UNAVAILABLE. high demand"))
     assert not is_transient(ValueError("400 INVALID_ARGUMENT"))
+
+
+def test_cloudflare_provider_uses_openai_compatible_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    from strands.models.openai import OpenAIModel
+
+    from fraud_investigator.models import build_provider
+    from fraud_investigator.settings import load_settings
+
+    monkeypatch.setenv("FRAUD_MODEL_PROVIDER", "cloudflare")
+    monkeypatch.setenv("FRAUD_MODEL_ID", "@cf/meta/llama-3.3-70b-instruct-fp8-fast")
+    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "acct123")
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "testing")  # building the client needs no network
+    s = load_settings()
+    model = build_provider("cloudflare", s)
+
+    assert isinstance(model, OpenAIModel)
+    assert s.model_id == "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    config = model.get_config()
+    assert config["model_id"] == s.model_id
+    assert "reasoning_effort" not in config["params"]  # only sent to gpt-oss models
+    assert model.client_args["base_url"] == "https://api.cloudflare.com/client/v4/accounts/acct123/ai/v1"
+    # Workers AI rejects an empty tools array, so a tool-free request must leave the field out.
+    messages = [{"role": "user", "content": [{"text": "hi"}]}]
+    request = model.format_request(messages, system_prompt="sys")  # type: ignore[arg-type]
+    assert "tools" not in request
+    assert [m["content"] for m in request["messages"]] == ["sys", "hi"]  # text parts sent as plain strings
+    spec = {"name": "t", "description": "d", "inputSchema": {"json": {"type": "object", "properties": {}}}}
+    assert len(model.format_request(messages, [spec])["tools"]) == 1  # type: ignore[arg-type]
+
+
+def test_cloudflare_provider_needs_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    from fraud_investigator.models import build_provider
+    from fraud_investigator.settings import load_settings
+
+    s = load_settings()
+    monkeypatch.delenv("CLOUDFLARE_ACCOUNT_ID", raising=False)
+    monkeypatch.delenv("CLOUDFLARE_API_TOKEN", raising=False)
+    with pytest.raises(RuntimeError, match="CLOUDFLARE_ACCOUNT_ID"):
+        build_provider("cloudflare", s)
+
+
+def test_framework_free_chat_speaks_openai_compatible_http() -> None:
+    import json
+
+    import httpx
+
+    from fraud_investigator.baseline.raw_agent_loop import OpenAICompatibleChat
+
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"], seen["body"] = str(request.url), json.loads(request.content)
+        seen["auth"] = request.headers["Authorization"]
+        call = {
+            "id": "c2",
+            "type": "function",
+            "function": {"name": "get_device_metadata", "arguments": '{"device_id": "D1"}'},
+        }
+        message = {"role": "assistant", "content": None, "tool_calls": [call]}
+        return httpx.Response(
+            200, json={"choices": [{"message": message}], "usage": {"prompt_tokens": 7, "completion_tokens": 3}}
+        )
+
+    chat = OpenAICompatibleChat("https://example.test/v1/", "key", "m", transport=httpx.MockTransport(handler))
+    messages = [
+        {"role": "user", "content": [{"text": "investigate"}]},
+        {"role": "assistant", "content": [{"toolUse": {"toolUseId": "c1", "name": "t", "input": {"a": 1}}}]},
+        {"role": "user", "content": [{"toolResult": {"toolUseId": "c1", "content": [{"text": "data"}]}}]},
+    ]
+    tool = {"name": "get_device_metadata", "description": "d", "parameters": {"type": "object", "properties": {}}}
+    turn = chat.complete("sys", messages, [tool])
+
+    assert seen["url"] == "https://example.test/v1/chat/completions" and seen["auth"] == "Bearer key"
+    sent = seen["body"]["messages"]
+    assert [m["role"] for m in sent] == ["system", "user", "assistant", "tool"]
+    assert sent[2]["tool_calls"][0]["function"]["arguments"] == '{"a": 1}' and sent[3]["tool_call_id"] == "c1"
+    assert turn.calls[0].name == "get_device_metadata" and turn.calls[0].args == {"device_id": "D1"}
+    assert (turn.input_tokens, turn.output_tokens) == (7, 3)
+    chat.complete("sys", messages[:1], [])
+    assert "tools" not in seen["body"]
+
+
+def test_cloudflare_falls_back_to_a_second_cloudflare_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    from fraud_investigator.models import FallbackModel, create_model, model_id_of
+    from fraud_investigator.settings import load_settings
+
+    monkeypatch.setenv("FRAUD_MODEL_PROVIDER", "cloudflare")
+    monkeypatch.setenv("FRAUD_MODEL_ID", "@cf/deepseek-ai/deepseek-v4.1-flash-1017")
+    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "acct123")
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "testing")
+    monkeypatch.delenv("FRAUD_MODEL_FALLBACK", raising=False)
+    s = load_settings()
+    s.model.fallback, s.model.fallback_model_id = "cloudflare", "@cf/zai-org/glm-5.3-flash"
+    model = create_model(s)
+
+    assert isinstance(model, FallbackModel)
+    assert model_id_of(model.primary) == "@cf/deepseek-ai/deepseek-v4.1-flash-1017"
+    assert model_id_of(model.secondary) == "@cf/zai-org/glm-5.3-flash"
+    s.model.fallback_model_id = "@cf/deepseek-ai/deepseek-v4.1-flash-1017"
+    assert not isinstance(create_model(s), FallbackModel)  # same model: no point falling back
+
+
+def test_tracing_registers_the_provider_globally(monkeypatch: pytest.MonkeyPatch) -> None:
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+
+    from fraud_investigator import observability
+    from fraud_investigator.settings import load_settings
+
+    registered: list = []
+    monkeypatch.setattr(trace, "set_tracer_provider", registered.append)
+    monkeypatch.setattr(observability, "_configured", False)
+    s = load_settings()
+    s.observability.enabled = True
+    assert observability.setup_tracing(s)
+    # Strands' spans and the pipeline's spans read the global provider; an unregistered one exports nothing.
+    assert len(registered) == 1 and isinstance(registered[0], TracerProvider)
+    monkeypatch.setattr(observability, "_configured", False)

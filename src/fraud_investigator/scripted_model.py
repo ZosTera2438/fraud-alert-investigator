@@ -11,7 +11,7 @@ failure modes a real model shows:
 - always_allow:       recommends allow whatever the evidence says.
 
 It is not a fraud model. Accuracy numbers from it measure the harness, not a
-language model; live numbers come from Gemini or Ollama (see evals/README).
+language model; live numbers come from Cloudflare Workers AI and Gemini (see evals/README).
 """
 
 from __future__ import annotations

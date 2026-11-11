@@ -1,0 +1,14 @@
+.venv/
+.git/
+.env
+plan/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+data/*.db
+data/runs/
+data/sessions/
+data/ml_model.pkl
+evals/reports/*.json
+evals/recordings/
+docs/

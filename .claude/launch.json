@@ -1,7 +1,11 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {"name": "api", "runtimeExecutable": "uv", "runtimeArgs": ["run", "uvicorn", "fraud_investigator.api.app:app", "--port", "8000"], "port": 8000},
-    {"name": "console", "runtimeExecutable": "uv", "runtimeArgs": ["run", "streamlit", "run", "ui/streamlit_app.py", "--server.headless", "true", "--server.port", "8501"], "port": 8501}
+    {"name": "api", "runtimeExecutable": "uv", "runtimeArgs": ["run", "python", "-m", "uvicorn", "fraud_investigator.api.app:app", "--port", "8000"], "port": 8000},
+    {"name": "console", "runtimeExecutable": "uv", "runtimeArgs": ["run", "--extra", "ui", "python", "-m", "streamlit", "run", "ui/streamlit_app.py", "--server.headless", "true", "--server.port", "8501"], "port": 8501, "autoPort": false},
+    {"name": "tools-http", "runtimeExecutable": "uv", "runtimeArgs": ["run", "python", "-m", "fraud_investigator.mcp_server", "--http", "8765"], "port": 8765, "autoPort": false},
+    {"name": "phoenix", "runtimeExecutable": "uvx", "runtimeArgs": ["--from", "arize-phoenix==20.24.0", "phoenix", "serve"], "port": 6006, "autoPort": false},
+    {"name": "api-stack", "runtimeExecutable": "uv", "runtimeArgs": ["run", "python", "-m", "uvicorn", "fraud_investigator.api.app:app", "--port", "8000"], "port": 8000, "autoPort": false,
+     "env": {"FRAUD_MODEL_PROVIDER": "scripted", "FRAUD_TRACING": "1", "FRAUD_OTLP_ENDPOINT": "http://localhost:6006/v1/traces", "FRAUD_TOOL_TRANSPORT": "mcp", "FRAUD_MCP_URL": "http://localhost:8765/mcp"}}
   ]
 }

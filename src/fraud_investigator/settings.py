@@ -10,7 +10,7 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, Field
 
-ProviderName = Literal["scripted", "gemini", "ollama", "replay"]
+ProviderName = Literal["scripted", "gemini", "cloudflare", "replay"]
 
 
 def project_root() -> Path:
@@ -24,20 +24,24 @@ def project_root() -> Path:
 
 
 class GeminiSettings(BaseModel):
-    model_id: str = "gemini-3.5-flash"
+    model_id: str = "gemini-3.7-flash"
     temperature: float = 0.0
     max_output_tokens: int = 2048
 
 
-class OllamaSettings(BaseModel):
-    host: str = "http://localhost:11434"
-    model_id: str = "qwen3:8b"
+class CloudflareSettings(BaseModel):
+    """Cloudflare Workers AI through its OpenAI-compatible endpoint (tool calling supported)."""
+
+    model_id: str = "@cf/deepseek-ai/deepseek-v4.1-flash-1017"
     temperature: float = 0.0
+    max_tokens: int = 4096  # reasoning models spend part of this on hidden reasoning
+    reasoning_effort: str | None = "low"  # gpt-oss only; hidden reasoning costs tokens and time
+    base_url: str = "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1"
 
 
 class AuxModelSettings(BaseModel):
-    provider: ProviderName = "gemini"
-    model_id: str = "gemini-3.5-flash-lite"
+    provider: ProviderName = "cloudflare"
+    model_id: str = "@cf/zai-org/glm-5.3-flash"
 
 
 class ModelSettings(BaseModel):
@@ -45,7 +49,7 @@ class ModelSettings(BaseModel):
     fallback: ProviderName | None = None
     fallback_model_id: str | None = None  # model for the fallback provider; defaults to that provider's model
     gemini: GeminiSettings = Field(default_factory=GeminiSettings)
-    ollama: OllamaSettings = Field(default_factory=OllamaSettings)
+    cloudflare: CloudflareSettings = Field(default_factory=CloudflareSettings)
     aux_model: AuxModelSettings = Field(default_factory=AuxModelSettings)
     recordings_dir: str = "evals/recordings"
 
@@ -108,8 +112,8 @@ class Settings(BaseModel):
         match self.model.provider:
             case "gemini":
                 return self.model.gemini.model_id
-            case "ollama":
-                return self.model.ollama.model_id
+            case "cloudflare":
+                return self.model.cloudflare.model_id
             case _:
                 return self.model.provider
 
@@ -120,16 +124,20 @@ def _apply_env(raw: dict[str, Any]) -> dict[str, Any]:
         model["provider"] = provider
     if model_id := os.environ.get("FRAUD_MODEL_ID"):
         provider = model.get("provider", "scripted")
-        if provider in ("gemini", "ollama"):
+        if provider in ("gemini", "cloudflare"):
             model.setdefault(provider, {})["model_id"] = model_id
-    if host := os.environ.get("OLLAMA_HOST"):
-        model.setdefault("ollama", {})["host"] = host
+    if (cf_model := os.environ.get("CLOUDFLARE_MODEL")) and not (model_id and model.get("provider") == "cloudflare"):
+        model.setdefault("cloudflare", {})["model_id"] = cf_model
     if db := os.environ.get("FRAUD_DATABASE"):
         raw.setdefault("paths", {})["database"] = db
     if fallback := os.environ.get("FRAUD_MODEL_FALLBACK"):
         model["fallback"] = None if fallback == "none" else fallback
     if os.environ.get("FRAUD_TRACING") == "1":
         raw.setdefault("observability", {})["enabled"] = True
+    if endpoint := os.environ.get("FRAUD_OTLP_ENDPOINT"):
+        raw.setdefault("observability", {})["otlp_endpoint"] = endpoint
+    if transport := os.environ.get("FRAUD_TOOL_TRANSPORT"):
+        raw.setdefault("tools", {})["transport"] = transport
     return raw
 
 

@@ -75,9 +75,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{alert['id']}  {alert['trigger_rule']:32s} {alert['amount']:>9.2f} AUD  {alert['status']}")
         return 0
     if args.command == "approve":
-        _print_outcome(
-            pipeline.resume(args.alert_id, {"approved": not args.reject, "approver": args.approver, "note": args.note})
-        )
+        try:
+            outcome = pipeline.resume(
+                args.alert_id, {"approved": not args.reject, "approver": args.approver, "note": args.note}
+            )
+        except KeyError:
+            print(f"No paused run for {args.alert_id}: it was never paused or has already been answered.")
+            return 1
+        _print_outcome(outcome)
         return 0
 
     outcome = pipeline.start(args.alert_id)

@@ -51,7 +51,7 @@
   <rect x="310" y="185" width="380" height="90" rx="8" class="code"/>
   <text x="500" y="208" text-anchor="middle" class="h">1. Intake node (code)</text>
   <text x="500" y="230" text-anchor="middle" class="t">Validate alert schema (Pydantic)</text>
-  <text x="500" y="248" text-anchor="middle" class="t">Create idempotency key</text>
+  <text x="500" y="248" text-anchor="middle" class="t">Check the card belongs to the customer</text>
   <text x="500" y="266" text-anchor="middle" class="t">Mask card number and personal data</text>
   <line x1="500" y1="275" x2="500" y2="303" class="flow" marker-end="url(#arrow)"/>
 
@@ -84,7 +84,7 @@
   <text x="905" y="518" text-anchor="middle" class="t">merchants, transactions</text>
   <rect x="1030" y="460" width="210" height="64" rx="8" class="tools"/>
   <text x="1135" y="484" text-anchor="middle" class="h">Fraud playbook index</text>
-  <text x="1135" y="502" text-anchor="middle" class="t">Vector search over</text>
+  <text x="1135" y="502" text-anchor="middle" class="t">BM25 keyword search over</text>
   <text x="1135" y="518" text-anchor="middle" class="t">fraud typology notes</text>
 
   <line x1="500" y1="405" x2="500" y2="433" class="flow" marker-end="url(#arrow)"/>
@@ -107,14 +107,14 @@
   <!-- 4. Decision agent -->
   <rect x="310" y="565" width="380" height="100" rx="8" class="agent"/>
   <text x="500" y="588" text-anchor="middle" class="h">4. Decision agent (Strands)</text>
-  <text x="500" y="610" text-anchor="middle" class="t">Writes InvestigationReport (structured output)</text>
+  <text x="500" y="610" text-anchor="middle" class="t">Calls guarded submit_decision, writes ReportDraft</text>
   <text x="500" y="628" text-anchor="middle" class="t">Recommends allow, escalate or block</text>
   <text x="500" y="646" text-anchor="middle" class="t">Cites evidence IDs for every finding</text>
 
   <!-- Model provider -->
   <rect x="800" y="615" width="440" height="70" rx="8" class="cross"/>
   <text x="1020" y="638" text-anchor="middle" class="h">Model provider (set in settings.yaml)</text>
-  <text x="1020" y="658" text-anchor="middle" class="t">Gemini Flash (cloud) or Ollama (local laptop)</text>
+  <text x="1020" y="658" text-anchor="middle" class="t">Cloudflare Workers AI (DeepSeek V4.1 Flash) or Gemini</text>
   <text x="1020" y="676" text-anchor="middle" class="t">Same agent code; used by both agents</text>
   <line x1="798" y1="645" x2="694" y2="625" class="dashed" marker-end="url(#arrow)"/>
 
@@ -165,7 +165,7 @@
   <text x="975" y="970" text-anchor="middle" class="s">approved</text>
   <rect x="1010" y="945" width="230" height="70" rx="8" class="danger"/>
   <text x="1125" y="972" text-anchor="middle" class="h">Block card and create case</text>
-  <text x="1125" y="994" text-anchor="middle" class="t">Idempotent; mock card service</text>
+  <text x="1125" y="994" text-anchor="middle" class="t">Key: alert + decision + policy version</text>
 
   <!-- Rejected path -->
   <path d="M830,1015 V1040 H500 V1017" class="flow" marker-end="url(#arrow)"/>

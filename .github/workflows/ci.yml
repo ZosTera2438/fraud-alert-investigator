@@ -28,7 +28,7 @@ jobs:
       - name: Generate data
         run: uv run python data/generate.py --seed 42
       - name: Evaluation and release gate
-        run: uv run python evals/run_evals.py --trials 3 --gate --quiet
+        run: uv run python evals/run_evals.py --provider scripted --trials 3 --gate --quiet
       - name: Upload scorecard
         if: always()
         uses: actions/upload-artifact@v4

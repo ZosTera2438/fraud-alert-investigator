@@ -1,4 +1,4 @@
-"""Model factory: Gemini (cloud), Ollama (local), scripted (offline) and replay.
+"""Model factory: Cloudflare Workers AI (live default), Gemini (comparison), scripted (offline) and replay.
 
 The provider comes from configuration, so the agents never import a provider.
 `FallbackModel` switches to the secondary provider when the primary is rate
@@ -16,7 +16,7 @@ import os
 import re
 from collections.abc import AsyncGenerator, AsyncIterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
 from pydantic import BaseModel
@@ -28,6 +28,9 @@ from strands.types.tools import ToolSpec
 
 from .scripted_model import Behaviour, ScriptedModel
 from .settings import ProviderName, Settings, get_settings
+
+if TYPE_CHECKING:
+    from strands.models.openai import OpenAIModel
 
 logger = logging.getLogger(__name__)
 
@@ -48,28 +51,64 @@ def build_provider(provider: ProviderName, settings: Settings, behaviour: Behavi
                 model_id=g.model_id,
                 params={"temperature": g.temperature, "max_output_tokens": g.max_output_tokens},
             )
-        case "ollama":
-            from strands.models.ollama import OllamaModel
-
-            o = settings.model.ollama
-            return OllamaModel(host=o.host, model_id=o.model_id, temperature=o.temperature)
+        case "cloudflare":
+            account, token = os.environ.get("CLOUDFLARE_ACCOUNT_ID"), os.environ.get("CLOUDFLARE_API_TOKEN")
+            if not account or not token:
+                raise RuntimeError("Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN to use the Cloudflare provider.")
+            c = settings.model.cloudflare
+            params: dict[str, Any] = {"temperature": c.temperature, "max_tokens": c.max_tokens}
+            if c.reasoning_effort and "gpt-oss" in c.model_id:
+                params["reasoning_effort"] = c.reasoning_effort
+            return _cloudflare_model_class()(
+                client_args={"api_key": token, "base_url": c.base_url.format(account_id=account)},
+                model_id=c.model_id,
+                params=params,
+            )
         case "replay":
             return ReplayModel(settings.resolve(settings.model.recordings_dir))
     raise ValueError(f"unknown provider {provider}")
+
+
+def _cloudflare_model_class() -> type[OpenAIModel]:
+    """OpenAIModel adjusted for the Workers AI request validator.
+
+    Workers AI rejects `"tools": []` (the field is left out instead) and, once a conversation has a
+    system prompt and tool turns, rejects message content given as a list of text parts (it is
+    joined into a plain string; lists holding anything other than text are left alone) and
+    assistant tool-call turns without a `content` field (an empty string is sent).
+    """
+    from strands.models.openai import OpenAIModel
+
+    class CloudflareModel(OpenAIModel):
+        def format_request(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+            request = super().format_request(*args, **kwargs)
+            if not request.get("tools"):
+                request.pop("tools", None)
+                request.pop("tool_choice", None)
+            for message in request.get("messages", []):
+                content = message.get("content")
+                if isinstance(content, list) and all(p.get("type") == "text" for p in content):
+                    message["content"] = "".join(p.get("text", "") for p in content)
+                elif content is None:
+                    message["content"] = ""  # tool-call turns: Workers AI requires the field
+            return request
+
+    return CloudflareModel
 
 
 def create_model(settings: Settings | None = None, behaviour: Behaviour = "diligent") -> Model:
     settings = settings or get_settings()
     primary = build_provider(settings.model.provider, settings, behaviour)
     fallback = settings.model.fallback
-    if settings.model.provider != "gemini" or not fallback:
-        return primary
+    if settings.model.provider not in ("cloudflare", "gemini") or not fallback:
+        return primary  # offline models never fall back
     fallback_settings = settings
     if fallback_id := settings.model.fallback_model_id:
         sub = settings.model.model_copy(deep=True)
         getattr(sub, fallback).model_id = fallback_id
         fallback_settings = settings.model_copy(update={"model": sub})
-    if fallback == "gemini" and fallback_settings.model.gemini.model_id == settings.model.gemini.model_id:
+    fallback_model_id = getattr(fallback_settings.model, fallback).model_id
+    if fallback == settings.model.provider and fallback_model_id == settings.model_id:
         return primary  # falling back to the same model would not help
     try:
         return FallbackModel(primary, build_provider(fallback, fallback_settings, behaviour))

@@ -23,22 +23,22 @@
   <rect x="0" y="0" width="1280" height="580" fill="#FFFFFF"/>
 
   <text x="30" y="40" class="h1">Fraud Alert Investigator: evaluation loop</text>
-  <text x="30" y="66" class="t">Runs on every pull request with recorded model responses, and nightly on the laptop against live Gemini and Ollama.</text>
+  <text x="30" y="66" class="t">Runs on every pull request with the offline scripted model, and on demand against live Cloudflare Workers AI and Gemini (record and replay).</text>
 
   <!-- Golden dataset -->
   <rect x="30" y="110" width="220" height="110" rx="8" class="tools"/>
   <text x="140" y="135" text-anchor="middle" class="h">Golden dataset</text>
-  <text x="140" y="158" text-anchor="middle" class="t">About 66 labelled alerts</text>
-  <text x="140" y="176" text-anchor="middle" class="t">Red-team cases: injection,</text>
+  <text x="140" y="158" text-anchor="middle" class="t">66 golden alerts (11 × 6)</text>
+  <text x="140" y="176" text-anchor="middle" class="t">12 red-team: injection,</text>
   <text x="140" y="194" text-anchor="middle" class="t">tool failure, malformed data</text>
   <line x1="250" y1="165" x2="278" y2="165" class="flow" marker-end="url(#arrow)"/>
 
   <!-- Harness -->
   <rect x="280" y="110" width="230" height="110" rx="8" class="agent"/>
   <text x="395" y="135" text-anchor="middle" class="h">Evaluation harness</text>
-  <text x="395" y="158" text-anchor="middle" class="t">Strands Evals experiment</text>
+  <text x="395" y="158" text-anchor="middle" class="t">Full pipeline, real tools</text>
   <text x="395" y="176" text-anchor="middle" class="t">Each case run 3 times</text>
-  <text x="395" y="194" text-anchor="middle" class="t">Tools served from fixtures</text>
+  <text x="395" y="194" text-anchor="middle" class="t">Fresh database per trial</text>
   <line x1="510" y1="165" x2="538" y2="165" class="flow" marker-end="url(#arrow)"/>
 
   <!-- Graders -->

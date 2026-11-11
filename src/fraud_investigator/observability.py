@@ -22,13 +22,19 @@ def setup_tracing(settings: Settings) -> bool:
     global _configured
     if _configured or not settings.observability.enabled:
         return _configured
+    from opentelemetry import trace
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from strands.telemetry import StrandsTelemetry
 
-    provider = TracerProvider(resource=Resource.create({"service.name": settings.observability.service_name}))
+    name = settings.observability.service_name
+    # openinference.project.name files the traces under their own Phoenix project instead of "default".
+    provider = TracerProvider(resource=Resource.create({"service.name": name, "openinference.project.name": name}))
     telemetry = StrandsTelemetry(tracer_provider=provider)
     telemetry.setup_otlp_exporter(endpoint=settings.observability.otlp_endpoint)
+    # StrandsTelemetry only registers a provider globally when it creates one itself. Strands' tracer and the
+    # pipeline's own spans both read the global provider, so without this every span went to the no-op provider.
+    trace.set_tracer_provider(provider)
     _configured = True
     logger.info("tracing to %s", settings.observability.otlp_endpoint)
     return True

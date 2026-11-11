@@ -1,39 +1,17 @@
 # Fraud Alert Investigator: Build Plan
 
+> This is the original plan from October 2026, kept as written. What was built differs in a few places: the live model is Cloudflare Workers AI (Gemini only for comparisons) instead of Gemini plus Ollama, and playbook search uses BM25 instead of a vector store. See [Differences from the plan](../README.md#differences-from-the-plan) and [ADR 0006](decisions/0006-offline-model-and-live-comparison.md).
+
 An agent that receives a card fraud alert, gathers transaction history, merchant information and device metadata, scores the risk and recommends **allow**, **escalate** or **block**, with a human approving every block.
 
-- Role target: AI engineer / agentic engineer.
 - Stack: Python 3.12, Strands Agents, Gemini (cloud) or Ollama (local), synthetic data only.
-- Diagrams: [Runtime flow](diagrams/architecture-flow.svg), [Evaluation loop](diagrams/evaluation-loop.svg).
-- Interview preparation: [Interview question bank](INTERVIEW_QUESTION_BANK.md).
+- Diagrams: [Runtime flow](diagrams/architecture-flow.svg), [Evaluation loop](diagrams/evaluation-loop.svg), [Deployment](diagrams/deployment.svg).
 
 ---
 
-## 1. What interviewers look for (as at 29 October 2026)
+## 1. Scope
 
-Collected from interview guides, interview experience write-ups and hiring scorecards listed in section 17.
-
-| Interviewer expectation | How this project shows it |
-| --- | --- |
-| Know when an agent is the wrong tool | Risk score is deterministic code; the model only investigates and explains |
-| Narrow, typed tools with useful errors | Five read-only tools with Pydantic inputs and outputs, served over Model Context Protocol |
-| Authorisation outside the model | Policy guard hook blocks any decision that disagrees with the score band |
-| Human approval for irreversible actions | Strands interrupt pauses the run before any card block |
-| Budgets and loop control | Hook caps tool calls and tokens per alert; breach means escalate |
-| Retries, timeouts, idempotency | Backoff on tools, idempotency key per alert, safe re-run of actions |
-| Resume after a crash | Strands session manager persists state per alert |
-| Prompt injection defence | Tool results treated as untrusted data; red-team cases in the evaluation set |
-| Evaluation of trajectories, repeated trials, release gate | Strands Evals harness, 3 trials per case, thresholds enforced in continuous integration |
-| Tracing, latency and cost per task | OpenTelemetry traces in Arize Phoenix, cost per alert reported |
-| Understand the loop under the framework | Framework-free baseline agent loop, compared against Strands |
-| Single agent versus multi-agent trade-off | Both built, measured and recorded in a decision record |
-| Product judgement and staged rollout | Shadow, assist and auto stages described with rollback in the README |
-
----
-
-## 2. Scope
-
-### Must have (interview-ready)
+### Must have (core)
 
 1. Synthetic data generator: customers, cards, devices, merchants, transactions, alerts.
 2. Five read-only tools: transaction history, merchant profile, device metadata, customer profile, fraud playbook search.
@@ -72,7 +50,7 @@ Collected from interview guides, interview experience write-ups and hiring score
 
 ---
 
-## 3. Architecture
+## 2. Architecture
 
 See [diagrams/architecture-flow.svg](diagrams/architecture-flow.svg).
 
@@ -94,11 +72,11 @@ Orchestration uses a Strands `Graph`: fixed order, auditable, one conditional re
 2. **Read and write permissions are split.** The investigator has read-only tools. Only the decision agent can call `submit_decision`, and hooks guard that call.
 3. **Fail safe is escalate.** Any tool failure, timeout, schema error or budget breach ends in escalate with a reason, never allow.
 4. **Graph over Swarm.** Investigation order is known in advance; a Swarm adds autonomy without benefit and is harder to audit.
-5. **Two agents, not one.** Different tools, permissions and evaluation signals. Measured against a single-agent baseline (section 12).
+5. **Two agents, not one.** Different tools, permissions and evaluation signals. Measured against a single-agent baseline (section 11).
 
 ---
 
-## 4. Tech stack
+## 3. Tech stack
 
 | Concern | Choice | Reason |
 | --- | --- | --- |
@@ -125,7 +103,7 @@ Model notes:
 
 ---
 
-## 5. Data design
+## 4. Data design
 
 ### Alert input
 
@@ -182,7 +160,7 @@ Six variants per scenario gives about 66 labelled cases.
 
 ---
 
-## 6. Risk scoring
+## 5. Risk scoring
 
 Weights and thresholds live in `config/scoring.yaml` so they are versioned and reviewable.
 
@@ -204,7 +182,7 @@ Weights and thresholds live in `config/scoring.yaml` so they are versioned and r
 
 ---
 
-## 7. Agent design
+## 6. Agent design
 
 ### Tools (read-only, Model Context Protocol server)
 
@@ -234,7 +212,7 @@ class InvestigationReport(BaseModel):
     score_breakdown: list[SignalResult]
     recommendation: Literal["allow", "escalate", "block"]
     confidence: Literal["low", "medium", "high"]
-    key_findings: list[Finding]          # each Finding has text and evidence_ids
+    key_findings: list[Finding]  # each Finding has text and evidence_ids
     mitigating_factors: list[Finding]
     analyst_summary: str = Field(max_length=800)
 ```
@@ -258,7 +236,7 @@ Human approval follows the Strands pattern: `event.interrupt(...)` in the hook, 
 
 ---
 
-## 8. Safety and guardrails
+## 7. Safety and guardrails
 
 1. Least privilege: read-only tools for the investigator; actions only through guarded `submit_decision`.
 2. Untrusted tool data: delimited, schema-validated, never placed in the system prompt.
@@ -270,7 +248,7 @@ Human approval follows the Strands pattern: `event.interrupt(...)` in the hook, 
 
 ---
 
-## 9. Reliability and state
+## 8. Reliability and state
 
 1. Tool timeouts (5 seconds) and retries with exponential backoff (3 attempts) for transient errors only.
 2. Idempotency key `alert_id + decision + version`: replaying an action returns the existing case.
@@ -280,7 +258,7 @@ Human approval follows the Strands pattern: `event.interrupt(...)` in the hook, 
 
 ---
 
-## 10. Observability
+## 9. Observability
 
 - Strands OpenTelemetry export to Arize Phoenix running locally.
 - One trace per alert: graph nodes, model calls (tokens, latency, finish reason), tool calls (name, status, duration), hook decisions, interrupt and approval events.
@@ -289,13 +267,13 @@ Human approval follows the Strands pattern: `event.interrupt(...)` in the hook, 
 
 ---
 
-## 11. Evaluation
+## 10. Evaluation
 
 See [diagrams/evaluation-loop.svg](diagrams/evaluation-loop.svg).
 
 ### Dataset
 
-- `evals/cases/golden.jsonl`: about 66 labelled alerts from section 5.
+- `evals/cases/golden.jsonl`: about 66 labelled alerts from section 4.
 - `evals/cases/red_team.jsonl`: injection, tool failure, malformed data, budget exhaustion.
 - Tools served from fixtures so runs are reproducible and never touch shared state.
 
@@ -327,7 +305,7 @@ Run on every pull request with recorded model responses, and nightly on the lapt
 
 ---
 
-## 12. Comparisons to run and record
+## 11. Comparisons to run and record
 
 1. Framework-free loop versus Strands: lines of code, features gained (hooks, interrupts, sessions, tracing).
 2. Single agent with all tools versus investigator plus decision agent: accuracy, cost, latency, injection resistance.
@@ -338,7 +316,7 @@ Record each as an architecture decision record in `docs/decisions/` with numbers
 
 ---
 
-## 13. Repository layout
+## 12. Repository layout
 
 ```text
 fraud-alert-investigator/
@@ -379,9 +357,9 @@ fraud-alert-investigator/
 
 ---
 
-## 14. Milestones
+## 13. Milestones
 
-Effort is in focused hours. Phases 0 to 5 make the project interview-ready; later phases make it stand out.
+Effort is in focused hours. Phases 0 to 5 deliver the core agent; later phases harden and extend it.
 
 | Phase | Deliverable | Done when | Effort |
 | --- | --- | --- | --- |
@@ -398,7 +376,7 @@ Effort is in focused hours. Phases 0 to 5 make the project interview-ready; late
 
 ---
 
-## 15. Demo script (5 minutes)
+## 14. Demo script (5 minutes)
 
 1. Show the architecture diagram and the reason the score is deterministic (30 seconds).
 2. Run an account takeover alert; open the trace in Phoenix (90 seconds).
@@ -408,26 +386,10 @@ Effort is in focused hours. Phases 0 to 5 make the project interview-ready; late
 
 ---
 
-## 16. Resume bullets (fill in measured numbers)
-
-- Built a fraud alert investigation agent in Python with Strands Agents that gathers transaction, merchant and device evidence through Model Context Protocol tools and recommends allow, escalate or block with cited evidence.
-- Kept risk scoring deterministic and enforced decision policy in agent hooks, with human approval through interrupts for every card block; [N] percent decision accuracy and [N] percent false block rate on a [N]-case labelled set.
-- Built an evaluation harness with trajectory, grounding and injection-resistance graders, run on every pull request, and compared Gemini and Ollama on accuracy, p95 latency ([N] seconds) and cost per alert ([N] AUD).
-- Added OpenTelemetry tracing, step and token budgets, idempotent actions and session persistence so paused or failed investigations resume safely.
-
----
-
-## 17. Sources (as at 29 October 2026)
+## 15. Sources (as at 29 October 2026)
 
 - Strands Agents model providers: https://strandsagents.com/docs/user-guide/sdk/model-providers/
 - Strands Python quickstart (Gemini, Ollama): https://strandsagents.com/docs/user-guide/sdk/quickstart/python/
 - Strands Graph pattern: https://strandsagents.com/docs/user-guide/sdk/multi-agent/graph/
 - Strands interrupts: https://strandsagents.com/docs/user-guide/sdk/interrupts/
 - Strands Evals: https://github.com/strands-agents/evals
-- Agentic system design interview, worked answer: https://fdeinterviewprep.com/blog/agentic-system-design-interview
-- Mock agent system design interview: https://engineering-playbook.vercel.app/agentic/mock-interview-agent-design
-- Agent harness and evaluation design question: https://prachub.com/interview-questions/design-an-agent-harness-and-evaluation-system
-- Generative AI system design questions (evaluations, guardrails): https://prachub.com/resources/generative-ai-system-design-interview-questions-rag-agents-evals-and-guardrails
-- Sierra agent engineer interview guide (take-home expectations): https://www.tryexponent.com/guides/sierra-agent-engineer-interview
-- Agentic developer hiring scorecard: https://www.fwdpod.com/insights/hiring-agentic-ai-developers
-- Agentic AI interview questions 2026: https://cloudsoftsol.com/interview-questions/agentic-ai-interview-questions-2026/

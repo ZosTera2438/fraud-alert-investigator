@@ -27,4 +27,4 @@ Keep two agents for least privilege, lower cost and separate evaluation signals 
 
 ## To measure with live models
 
-Run `uv run python evals/compare.py --providers gemini,ollama`. Real models may differ from the scripted policy in how often they follow injected text.
+Run `uv run python evals/compare.py --providers cloudflare,gemini`. Real models may differ from the scripted policy in how often they follow injected text.

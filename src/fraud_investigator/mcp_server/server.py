@@ -1,7 +1,8 @@
 """Model Context Protocol server exposing the five read-only tools.
 
     uv run python -m fraud_investigator.mcp_server                 # stdio (used by the agent)
-    uv run python -m fraud_investigator.mcp_server --http 8765     # streamable HTTP (docker compose)
+    uv run python -m fraud_investigator.mcp_server --http 8765     # streamable HTTP on 127.0.0.1
+    python -m fraud_investigator.mcp_server --http 8765 --host 0.0.0.0   # inside docker compose's private network
 
 Results use the same `<tool_data>` / `<tool_error>` format as the local tools,
 so the agent, the evidence hook and the scoring engine cannot tell them apart.
@@ -76,9 +77,14 @@ def build_server(backend: DataBackend | None = None) -> MCPServer:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fraud investigator MCP tool server")
     parser.add_argument("--http", type=int, help="serve streamable HTTP on this port instead of stdio")
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="interface to bind; the server has no authentication, so only widen this inside a private network",
+    )
     args = parser.parse_args()
     server = build_server()
     if args.http:
-        server.run("streamable-http", host="0.0.0.0", port=args.http)  # type: ignore[call-overload]
+        server.run("streamable-http", host=args.host, port=args.http)  # type: ignore[call-overload]
     else:
         server.run("stdio")

@@ -1,7 +1,7 @@
-"""Comparisons recorded in docs/decisions (section 12 of the plan).
+"""Comparisons recorded in docs/decisions (section 11 of the plan).
 
     uv run --extra ml python evals/compare.py                    # offline: architectures, rules vs blend
-    uv run python evals/compare.py --providers gemini,ollama      # adds the live model comparison
+    uv run python evals/compare.py --providers cloudflare,gemini  # adds the live model comparison
 
 Writes evals/reports/comparison.md and comparison.json.
 """
@@ -165,11 +165,13 @@ def table(rows: list[dict]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--providers", default="", help="comma separated live providers, e.g. gemini,ollama")
+    parser.add_argument("--providers", default="", help="comma separated live providers, e.g. cloudflare,gemini")
     args = parser.parse_args()
     golden = load_cases(ROOT / "evals" / "cases" / "golden.jsonl")
     red = load_cases(ROOT / "evals" / "cases" / "red_team.jsonl")
     injection = [c for c in golden + red if "injection" in c.get("tags", []) and c.get("model_behaviour") == "diligent"]
+    # The offline comparisons must not pick up a live provider from .env; set variables win over .env.
+    os.environ["FRAUD_MODEL_PROVIDER"] = "scripted"
     result = {
         "generated_at": datetime.now(UTC).isoformat(),
         "architectures": architectures(golden, injection),
@@ -179,11 +181,17 @@ def main() -> None:
     out = ROOT / "evals" / "reports"
     out.mkdir(parents=True, exist_ok=True)
     (out / "comparison.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+    live = (
+        table(result["providers"])
+        if result["providers"]
+        else "Not part of this run (pass `--providers cloudflare,gemini`). The live sample is in "
+        "[gemini-vs-cloudflare.md](gemini-vs-cloudflare.md).\n"
+    )
     md = (
         f"# Comparisons\n\nGenerated {result['generated_at'][:16]} UTC with the scripted model unless noted.\n\n"
         f"## Architectures (golden set, plus injection cases with an injection-following model)\n\n"
         f"{table(result['architectures'])}\n## Rules only versus rules plus model\n\n{table(result['rules_vs_blend'])}"
-        f"\n## Live providers\n\n{table(result['providers'])}"
+        f"\n## Live providers\n\n{live}"
     )
     (out / "comparison.md").write_text(md, encoding="utf-8")
     print(md)

@@ -2,7 +2,7 @@
 
     uv run python evals/run_evals.py                      # scripted model, golden + red team, 3 trials
     uv run python evals/run_evals.py --provider gemini    # live Gemini (needs GEMINI_API_KEY)
-    uv run python evals/run_evals.py --provider ollama    # local Ollama
+    uv run python evals/run_evals.py --model cloudflare:@cf/openai/gpt-oss-120b --per-scenario 1 --trials 1
     uv run python evals/run_evals.py --model gemini:gemini-2.5-flash --model gemini:gemini-2.5-flash-lite
         --workers 4 --judge --report-name gemini-comparison    # compare two Gemini models
     uv run python evals/run_evals.py --behaviour lazy     # inject a regression: the gate must fail
@@ -38,7 +38,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--provider",
-        choices=["scripted", "gemini", "ollama", "replay"],
+        choices=["scripted", "cloudflare", "gemini", "replay"],
         action="append",
         help="repeat to compare providers; default from settings",
     )

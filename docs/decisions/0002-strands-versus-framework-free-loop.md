@@ -4,7 +4,7 @@ Status: accepted (2026-10-31)
 
 ## Context
 
-Interviewers ask whether you understand the loop under the framework. `baseline/raw_agent_loop.py` implements the same investigation by hand: call the model with tool specs, run the requested tools, append results, repeat, with the budget, scope check, policy guard and approval written inline.
+To see what the framework actually adds, `baseline/raw_agent_loop.py` implements the same investigation by hand: call the model with tool specs, run the requested tools, append results, repeat, with the budget, scope check, policy guard and approval written inline.
 
 ## Measurements
 
@@ -27,7 +27,7 @@ Both reuse the backend, scoring engine, policy rules and actions, so the line co
 | OpenTelemetry spans for model and tool calls | Built in | None |
 | Hooks reusable across agents and the Graph | Yes | Checks are inline in `_dispatch` |
 | Model Context Protocol tools | `MCPClient` | Not implemented |
-| Provider switch (Gemini, Ollama) | Model classes | One hand-written Ollama adapter |
+| Provider switch (Cloudflare, Gemini) | Model classes | One hand-written OpenAI-compatible HTTP adapter |
 
 ## Decision
 
